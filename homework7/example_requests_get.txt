@@ -1,0 +1,983 @@
+========================================
+def resolve_reference_http(cls, design_uri):
+        """Retrieve design documents from http/https endpoints.
+
+        Return a byte array of the response content. Support unsecured or
+        basic auth
+
+        :param design_uri: Tuple as returned by urllib.parse for the design reference
+        """
+        if design_uri.username is not None and design_uri.password is not None:
+            response = requests.get(
+                design_uri.geturl(),
+                auth=(design_uri.username, design_uri.password),
+                timeout=get_client_timeouts())
+        else:
+            response = requests.get(
+                design_uri.geturl(), timeout=get_client_timeouts())
+
+        return response.content 
+========================================
+def getTicket():
+    # put the ip address or dns of your apic-em controller in this url
+    url = "https://" + controller + "/api/v1/ticket"
+
+    #the username and password to access the APIC-EM Controller
+    payload = {"username":"usernae","password":"password"}
+
+    #Content type must be included in the header
+    header = {"content-type": "application/json"}
+
+    #Performs a POST on the specified url to get the service ticket
+    response= requests.post(url,data=json.dumps(payload), headers=header, verify=False)
+
+    #convert response to json format
+    r_json=response.json()
+
+    #parse the json to get the service ticket
+    ticket = r_json["response"]["serviceTicket"]
+
+    return ticket 
+========================================
+def open_url(url: str) -> Iterator[BytesIO]:
+    parsed_url = requests.utils.urlparse(url)
+    if parsed_url.scheme == 'file':
+        assert parsed_url.netloc == '', f'Bad file URL: {url}'
+        with open(requests.utils.unquote(parsed_url.path), 'rb') as infile:
+            yield infile
+    elif parsed_url.scheme in ['http', 'https']:
+        # verify=True is the default, but I want to be explicit about HTTPS,
+        # since this function receives GPG key material.
+        with requests.get(url, stream=True, verify=True) as r:
+            r.raise_for_status()
+            yield r.raw  # A file-like `io`-style object for the HTTP stream
+            if r.raw.isclosed():   # Proxy for "all data was consumed"
+                # Sadly, requests 2.x does not verify content-length :/
+                # We could check r.raw.length_remaining, likely equivalent.
+                actual_size = r.raw.tell()
+                header_size = int(r.headers['content-length'])
+                assert actual_size == header_size, (actual_size, header_size)
+    else:  # pragma: no cover
+        raise RuntimeError(f'Unknown URL scheme in {url}') 
+========================================
+def __init__(self, url, method='get', data=None, params=None,
+                 headers=None, content_type='application/json', **kwargs):
+        self.url = url
+        self.method = method
+        self.params = params or {}
+        self.kwargs = kwargs
+
+        if not isinstance(headers, dict):
+            headers = {}
+        self.headers = CaseInsensitiveDict(headers)
+        if content_type:
+            self.headers['Content-Type'] = content_type
+        if data:
+            self.data = json.dumps(data)
+        else:
+            self.data = {} 
+========================================
+def __call__(self, client, dnode):
+        logger.info('Test download speed :  running...')
+        start = time.clock()
+        r = requests.get('http://{}'.format(dnode), stream=True)
+        total_length = int(r.headers.get('content-length'))
+        if total_length is None:
+            logger.error("Empty file!")
+        else:
+            array_speed = []
+            start_chunk = time.clock()
+            for chunk in r.iter_content(1024):  # 1kB1024 1MB 1048576
+                end_chunk = time.clock()
+                delta = end_chunk - start_chunk
+                start_chunk = end_chunk
+                if delta <= 0:
+                    break
+                else:
+                    array_speed.append(1//delta)  # kB / s
+
+            end = time.clock()
+            yield from self._queue.put(self.get_result(dnode, start, end, total_length, array_speed)) 
+========================================
+def acceleration(self, array_speed):
+        """Caculate acceleration.
+
+        By get the highest speed in the first cycle.
+
+        Args:
+            array_speed (list): list download times for each 1024 Byte
+
+        Returns:
+            acceleration (kB/s) : the deviation between highest speed and first byte speed
+        """
+
+        if len(array_speed) == 0:
+            return 0
+        speed_before = array_speed[0]
+        for speed in array_speed:
+            if speed < speed_before:
+                break
+            else:
+                speed_before = speed
+
+        return speed_before - array_speed[0] 
+========================================
+def get_by_url(url):
+    # Get show data from svtplay.se.
+    r = requests.get('%s?type=embed&output=json' % (url))
+    r.raise_for_status()
+
+    response_json = r.json()
+    video = response_json.get('video')
+
+    # Get the highest quality video stream.
+    for vr in video.get('videoReferences'):
+        if vr.get('playerType') == 'ios':
+            unscrubbed_url = vr.get('url')
+            try:
+                # remove all getvars from link
+                scrubbed_url = unscrubbed_url[:unscrubbed_url.index('.m3u8') + 5]
+                return scrubbed_url
+            except IndexError:
+                if unscrubbed_url:
+                    print('Stream url used old format without alt getvar. Trying old style...')
+                    return unscrubbed_url
+                else:
+                    print('Empty url to stream. Exiting.') 
+========================================
+def test_repomd(self):
+        content = b'An abacus falls from a fig tree'
+        timestamp = 1234567890
+        with self.repo_server_thread({
+            'repomd.xml': {
+                'size': len(content),
+                'build_timestamp': timestamp,
+                'content_bytes': content,
+            }
+        }) as (host, port):
+            req = requests.get(f'http://{host}:{port}/repomd.xml')
+            req.raise_for_status()
+            self.assertEqual(content, req.content)
+            self.assertEqual(
+                timestamp,
+                email.utils.parsedate_to_datetime(req.headers['last-modified'])
+                    .timestamp(),
+            )
+            self.assertEqual('text/xml', req.headers['content-type']) 
+========================================
+def _check_bad_blob(self, bad_blob):
+        with self.repo_server_thread({'bad_blob': bad_blob}) as (host, port):
+            # Drive-by test of HEAD requests -- note that this doesn't
+            # detect the error yet, so the next GET "succeeds".
+            req_head = requests.head(f'http://{host}:{port}/bad_blob')
+            req = requests.get(f'http://{host}:{port}/bad_blob')
+            self.assertEqual(req_head.status_code, req.status_code)
+            self.assertEqual(_no_date(req_head.headers), _no_date(req.headers))
+            # You'd think that `requests` would error on this, but, no...
+            # https://blog.petrzemek.net/2018/04/22/
+            #   on-incomplete-http-reads-and-the-requests-library-in-python/
+            self.assertEqual(200, req.status_code)
+            self.assertLess(
+                req.raw.tell(),  # Number of bytes that were read
+                int(req.headers['content-length']),
+            )
+            # Ok, so we didn't get enough bytes, let's retry. This verifies
+            # that the server memoizes integrity errors correctly.
+            req = requests.get(f'http://{host}:{port}/bad_blob')
+            self.assertEqual(500, req.status_code)
+            self.assertIn(b'file_integrity', req.content)
+            return req.content.decode() 
+========================================
+def init_inventory_container(container,headers=None, org_name=None):
+    
+    initialize_config()
+    
+    headers = headers if headers else TSC_HEADERS
+    org_name = org_name if org_name else ORG_NAME
+    
+    def _container_url(container_id):
+            return 'https://secure.transcriptic.com/{}/samples/{}.json'.format(org_name, container_id)
+
+    response = requests.get(_container_url(container.id), headers=headers, verify=False)
+    response.raise_for_status()
+
+    container_json = response.json()   
+    
+    container.cover = container_json['cover']
+    
+    for well in container.all_wells():
+        init_inventory_well(well,container_json=container_json)
+    
+   
+#@TODO: this needs to be mocked in tests since it hits the transcriptic api 
+========================================
+def __init__(self, email: str, api_key: str, domain: str, proxied: bool):
+        """
+        Initialization. It will set the zone information of the domain for operation.
+        It will also get dns records of the current zone.
+        :param email:
+        :param api_key:
+        :param domain:
+        :param proxied:
+        """
+        self.email = email
+        self.api_key = api_key
+        self.domain = domain
+        self.proxied = proxied
+        self.headers = {
+            'X-Auth-Key': api_key,
+            'X-Auth-Email': email
+        }
+        self.setup_zone() 
+========================================
+def setup_zone(self):
+        """
+        Setup zone for current domain.
+        It will also setup the dns records of the zone
+        :return:
+        """
+        # Initialize current zone
+        zones_content = self.request(self.api_url, 'get')
+        try:
+            if len(self.domain.split('.')) == 3:
+                domain = self.domain.split('.', 1)[1]
+            else:
+                domain = self.domain
+            zone = [zone for zone in zones_content['result'] if zone['name'] == domain][0]
+        except IndexError:
+            raise ZoneNotFound('Cannot find zone information for the domain {domain}.'
+                               .format(domain=self.domain))
+        self.zone = zone
+
+        # Initialize dns_records of current zone
+        dns_content = self.request(self.api_url + zone['id'] + '/dns_records', 'get')
+        self.dns_records = dns_content['result'] 
+========================================
+def convert_ensembl_to_entrez(self, ensembl):
+        """Convert Ensembl Id to Entrez Gene Id"""
+        if 'ENST' in ensembl:
+            pass
+        else:
+            raise (IndexError)
+        # Submit resquest to NCBI eutils/Gene database
+        server = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?" + self.options + "&db=gene&term={0}".format(
+            ensembl)
+        r = requests.get(server, headers={"Content-Type": "text/xml"})
+        if not r.ok:
+            r.raise_for_status()
+            sys.exit()
+        # Process Request
+        response = r.text
+        info = xmltodict.parse(response)
+        try:
+            geneId = info['eSearchResult']['IdList']['Id']
+        except TypeError:
+            raise (TypeError)
+        return geneId 
+========================================
+def convert_hgnc_to_entrez(self, hgnc):
+        """Convert HGNC Id to Entrez Gene Id"""
+        entrezdict = {}
+        server = "http://rest.genenames.org/fetch/hgnc_id/{0}".format(hgnc)
+        r = requests.get(server, headers={"Content-Type": "application/json"})
+        if not r.ok:
+            r.raise_for_status()
+            sys.exit()
+        response = r.text
+        info = xmltodict.parse(response)
+        for data in info['response']['result']['doc']['str']:
+            if data['@name'] == 'entrez_id':
+                entrezdict[data['@name']] = data['#text']
+            if data['@name'] == 'symbol':
+                entrezdict[data['@name']] = data['#text']
+        return entrezdict 
+========================================
+def convert_uniprot_to_entrez(self, uniprot):
+        """Convert Uniprot Id to Entrez Id"""
+        # Submit request to NCBI eutils/Gene Database
+        server = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?" + self.options + "&db=gene&term={0}".format(
+            uniprot)
+        r = requests.get(server, headers={"Content-Type": "text/xml"})
+        if not r.ok:
+            r.raise_for_status()
+            sys.exit()
+        # Process Request
+        response = r.text
+        info = xmltodict.parse(response)
+        geneId = info['eSearchResult']['IdList']['Id']
+        # check to see if more than one result is returned
+        # if you have more than more result then check which Entrez Id returns the same uniprot Id entered.
+        if len(geneId) > 1:
+            for x in geneId:
+                c = self.convert_entrez_to_uniprot(x)
+                c = c.lower()
+                u = uniprot.lower()
+                if c == u:
+                    return x
+        else:
+            return geneId 
+========================================
+def resolve_reference_ucp(cls, design_uri):
+        """Retrieve artifacts from a Airship service endpoint.
+
+        Return a byte array of the response content. Assumes Keystone
+        authentication required.
+
+        :param design_uri: Tuple as returned by urllib.parse for the design reference
+        """
+        ks_sess = KeystoneUtils.get_session()
+        (new_scheme, foo) = re.subn(r'^[^+]+\+', '', design_uri.scheme)
+        url = urllib.parse.urlunparse(
+            (new_scheme, design_uri.netloc, design_uri.path, design_uri.params,
+             design_uri.query, design_uri.fragment))
+        LOG.debug("Calling Keystone session for url %s" % str(url))
+        resp = ks_sess.get(url, timeout=get_client_timeouts())
+        if resp.status_code >= 400:
+            raise errors.InvalidDesignReference(
+                "Received error code for reference %s: %s - %s" %
+                (url, str(resp.status_code), resp.text))
+        return resp.content 
+========================================
+def client():
+    with vcr.use_cassette('tests/fixtures/vcr_cassettes/client.yaml'):
+        request = requests.get(URL,
+                            headers={
+                                'Host': 'swapi.graphene-python.org',
+                                'Accept': 'text/html',
+                            })
+        request.raise_for_status()
+        csrf = request.cookies['csrftoken']
+
+        return Client(
+            transport=RequestsHTTPTransport(url=URL,
+                                            cookies={"csrftoken": csrf},
+                                            headers={'x-csrftoken':  csrf}),
+            fetch_schema_from_transport=True
+        ) 
+========================================
+def __init__(self, name, site='https://roll20.net/compendium/dnd5e/'):
+        self.name = name.rstrip().title()
+        formatted_name = self.name.replace(' ', '_')
+        url = site + formatted_name
+        page = requests.get(url)
+        if page.status_code != 200:
+            raise IOError('{:s} not found at {:s}.'.format(name,
+                                                           url))
+        if 'marketplace' in page.url:
+              raise IOError('{:s} not found at {:s}, '
+                            'likely because this content is behind a paywall. '
+                            'Encourage developer to add alternative back-ends to Roll20'.format(name, url))
+        html = page.text
+        soup = bs(html, 'html.parser')
+        self.attributes = ({stringify(a.text):
+                            stringify(a.find_next(attrs={'class':
+                                                         'value'}).text)
+                            for a in soup.find_all(attrs={'class':
+                                                          'col-md-3 attrName'})})
+        self.desc = '\n'.join([stringify(val.text)
+                               for val in soup.find_all(id='origpagecontent',
+                                                        attrs={'type':
+                                                               'text/html'})]) 
+========================================
+def str_attributes(self):
+        res = ''
+        for k in ['HP', 'AC', 'Speed', 'Challenge Rating']:
+            res += k + ': ' + self.get(k, 'EMPTY') + '\n'
+        res += '\n'
+        for k in ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']:
+            res += k + '\t'
+        res += '\n'
+        for k in ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']:
+            s = self.get(k, None)
+            res += '{:s} ({:s})\t'.format(s, score_to_mod(int(s)))
+        res += '\n\n'
+        for k in ['Type', 'Size', 'Alignment', 'Senses', 'Skills',
+                  'Languages']:
+            res += k + ': ' + self.get(k, 'EMPTY') + '\n'
+        return res 
+========================================
+def as_dungeonsheets_class(self):
+        spell_name = self.name
+        class_name = spell_name.replace(' ', '').replace('-', '')
+        res = 'class {:s}(Spell):\n'.format(class_name)
+        res += "    \"\"\"{:s}\n    \"\"\"\n".format(self.desc.replace('\n', '\n    '))
+        res += "    name = \"{:s}\"\n".format(spell_name)
+        res += "    level = {:d}\n".format(int(self.get('Level', -1)))
+        res += "    casting_time = \"{:s}\"\n".format(self.get('Casting Time', '1 action'))
+        res += "    casting_range = \"{:s}\"\n".format(self.get('Range', ''))
+        str_components = self.get('Components', '').upper().split(' ')
+        if len(str_components) == 0:
+            res += "    components = ()\n"
+        else:
+            res += "    components = {:s}\n".format(str(tuple(str_components)))
+        res += "    materials = \"\"\"{:s}\"\"\"\n".format(self.get('Material', ''))
+        dur_text = "\"{:s}\"\n".format(self.get('Duration', 'Instantaneous'))
+        dur_text = ("\"Concentration, {:s}".format(dur_text.lstrip('\"')) if
+                    self.get('Concentration', '') else dur_text)
+        duration = "    duration = " + dur_text
+        res += duration
+        res += "    ritual = {:}\n".format(bool(self.get('Ritual', '')))
+        res += "    magic_school = \"{:s}\"\n".format(self.get('School', ''))
+        res += "    classes = {:s}\n".format(str(tuple(self.get('Classes', '').split(', '))))
+        return res + "\n" 
+========================================
+def get_vmprofiles(self):
+        url = 'https://%s/php/vmprofiles.php' % self.atdserver
+
+        try:
+            r = requests.get(url, headers=self.sessionhdr, verify=False)
+        except Exception as e:
+            error_info = 'Error getting vmprofiles:\n%s' % e
+            return(0, error_info)
+
+        if r.status_code == 200:
+            server_info = json.loads(r.content)
+
+            if server_info['success'] is True:
+                return (1, server_info['results'])
+
+            else:
+                error_info = 'Error getting vmprofiles, check credentials or content type header'
+                return (0, error_info)
+        else:
+            error_info = 'Error getting vmprofiles, status code: %d' % r.status_code
+            return (0, error_info) 
+========================================
+def getNetworkDevices(ticket):
+    # URL for network device REST API call to get list of existing devices on the network.
+    url = "https://" + controller + "/api/v1/network-device"
+
+    #Content type must be included in the header as well as the ticket
+    header = {"content-type": "application/json", "X-Auth-Token":ticket}
+
+    # this statement performs a GET on the specified network-device url
+    response = requests.get(url, headers=header, verify=False)
+
+    # json.dumps serializes the json into a string and allows us to
+    # print the response in a 'pretty' format with indentation etc.
+    print ("Network Devices = ")
+    print (json.dumps(response.json(), indent=4, separators=(',', ': ')))
+
+  #convert data to json format.
+    r_json=response.json()
+
+  #Iterate through network device data and print the id and series name of each device
+    for i in r_json["response"]:
+        print(i["id"] + "   " + i["series"])
+
+#call the functions 
+========================================
+def __call__(self, client, dnode):
+        logger.info('Caculating time for download first byte...')
+        r = requests.get('http://{}'.format(dnode), stream=True)
+        total_length = int(r.headers.get('content-length'))
+        if total_length is None:
+            logger.info("empty file!")
+        else:
+            start_chunk = time.clock()
+            for chunk in r.iter_content(1024):  # 1kB1024 1MB 1048576
+                end_chunk = time.clock()
+                break
+
+            delta = end_chunk - start_chunk  # time to first byte
+            yield from self._queue.put(self.get_result(dnode, delta)) 
+========================================
+def get_client_id():
+    r = requests.get(CDN_BASE + 'global.js')
+    if r.status_code >= 400:
+        raise Exception('Error fetching global.js script.')
+
+    # Find the client ID with a regex that totally wont match anything else /s
+    client_ids = re.findall(r'clientID:"(\w*)"', r.text)
+    if len(client_ids) != 1:
+        raise Exception(
+            'Error finding client ID in twitch global-frontend script. Got {}'.format(client_ids))
+    return client_ids[0] 
+========================================
+def get_token_and_signature(channel, client_id):
+    url = TOKEN_API.format(channel=channel)
+    headers = {'Client-ID': client_id}
+    r = requests.get(url, headers=headers)
+    if r.status_code >= 400:
+        raise Exception('Error requesting token from twitch: {}'.format(r.text))
+    data = r.json()
+    return data['token'], data['sig'] 
+========================================
+def get_live_stream(channel):
+    client_id = get_client_id()
+    token, sig = get_token_and_signature(channel, client_id)
+    url = USHER_API.format(channel=channel, sig=sig, token=token, random=random.randint(0, 1E7))
+    r = requests.get(url)
+    m3u8_obj = m3u8.loads(r.text)
+    return m3u8_obj 
+========================================
+def get_api_data(self):
+        """
+        Gets json file containing server information
+
+        :return: server information in json format
+        """
+        try:
+            resp = requests.get(api, timeout=5)
+            if resp.status_code == requests.codes.ok:
+                return resp.json()
+            else:
+                self.statusbar.showMessage("Get API failed", 2000)
+        except Exception as ex:
+            self.statusbar.showMessage("Get API failed", 2000) 
+========================================
+def get_ovpn(self):
+        """
+        Gets ovpn file from nord servers and saves it to a temporary location
+        """
+        # https://downloads.nordcdn.com/configs/files/ovpn_udp/servers/sg173.nordvpn.com.udp.ovpn
+        self.ovpn_path = None
+        ovpn_url = None
+        udp_url = 'https://downloads.nordcdn.com/configs/files/ovpn_udp/servers/'
+        tcp_url = 'https://downloads.nordcdn.com/configs/files/ovpn_tcp/servers/'
+        udp_xor_url = 'https://downloads.nordcdn.com/configs/files/ovpn_xor_udp/servers/'
+        tcp_xor_url = 'https://downloads.nordcdn.com/configs/files/ovpn_xor_tcp/servers/'
+
+        if (self.server_type_select.currentText() == 'Obfuscated Server') and (self.connection_type_select.currentText() == 'UDP'):
+            ovpn_url = udp_xor_url
+        elif (self.server_type_select.currentText() == 'Obfuscated Server') and (self.connection_type_select.currentText() == 'TCP'):
+            ovpn_url = tcp_xor_url
+        elif (self.server_type_select.currentText() != 'Obfuscated Server') and (self.connection_type_select.currentText() == 'UDP'):
+            ovpn_url = udp_url
+        elif (self.server_type_select.currentText() != 'Obfuscated Server') and (self.connection_type_select.currentText() == 'TCP'):
+            ovpn_url = tcp_url
+
+        if self.connection_type_select.currentText() == 'UDP':
+            filename = self.domain_list[self.server_list.currentRow()] + '.udp.ovpn'
+            ovpn_file = requests.get(ovpn_url + filename, stream=True)
+            if ovpn_file.status_code == requests.codes.ok:
+                self.ovpn_path = os.path.join(self.config_path, filename)
+                with open(self.ovpn_path, 'wb') as out_file:
+                    shutil.copyfileobj(ovpn_file.raw, out_file)
+            else: self.statusbar.showMessage('Error fetching configuration files', 2000)
+
+        elif self.connection_type_select.currentText() == 'TCP':
+            filename = self.domain_list[self.server_list.currentRow()] + '.tcp.ovpn'
+            ovpn_file = requests.get(ovpn_url + filename, stream=True)
+            if ovpn_file.status_code == requests.codes.ok:
+                self.ovpn_path = os.path.join(self.config_path, filename)
+                with open(self.ovpn_path, 'wb') as out_file:
+                    shutil.copyfileobj(ovpn_file.raw, out_file)
+            else: self.statusbar.showMessage('Error fetching configuration files', 2000)
+
+        self.server_list.setFocus() 
+========================================
+def updateFactorio():
+	
+
+	file_name = "/tmp/latestFactorio.tar.gz"
+	print("Downloading %s" % file_name)
+
+	r = requests.get(DOWNLOADURL, stream=True)
+	total_length = int(r.headers.get('content-length'))
+
+	if not os.path.isfile(file_name) or total_length != os.path.getsize(file_name):
+		with open(file_name, 'wb') as f:
+			for chunk in progress.bar(r.iter_content(chunk_size=1024), expected_size=(total_length/1024) + 1): 
+				if chunk:
+					f.write(chunk)
+					f.flush()
+			#os.chmod(file_name, stat.S_IWUSR | stat.S_IRUSR)
+	else:
+		print("File already exists and file sizes match. Skipping download.")	
+
+	if os.access(FACTORIOPATH, os.W_OK):
+		if os.path.isfile(file_name):
+			tar = tarfile.open(file_name, "r:gz")
+			tar.extractall(path="/tmp")
+			tar.close()
+
+			copytree("/tmp/factorio", FACTORIOPATH)
+			print("Success.")
+		else:
+			print("Help! Can't find %s, but I should have!" % (file_name))
+			sys.exit(1)			
+	else:
+		print("Can't write to %s" % (FACTORIOPATH))
+		sys.exit(1) 
+========================================
+def get_dict_optional_value(d,keys_to_try_in_order, default_value=None):
+    """
+    Tries each key in order, if not value is found, returns default_value
+    """
+    
+    for key in keys_to_try_in_order:
+        if key in d and d.get(key):
+            return d[key]
+        
+    return default_value 
+========================================
+def get_melting_temp(dna_sequence, oligo_concentration_uM,
+                     pcr_settings='q5'):
+    global IDT_COOKIE
+    
+    #@TODO: update this to use http://tmcalculator.neb.com/#!/ since its probably accounting for the salt concentration in the buffer
+    
+    if not IDT_COOKIE:
+        r = requests.get('http://www.idtdna.com/calc/analyzer',allow_redirects=False)
+        IDT_COOKIE = r.cookies['ASP.NET_SessionId']       
+        
+    headers = {"content-type":'application/json','Cookie':'ASP.NET_SessionId=%s'%IDT_COOKIE}
+    
+    idt_response = requests.post('https://www.idtdna.com/calc/analyzer/home/analyze',json={
+        "settings": {
+            "Sequence": dna_sequence,
+            "NaConc": 0,
+            "MgConc": 2,
+            "DNTPsConc": 5, 
+            "OligoConc": oligo_concentration_uM,
+            "NucleotideType": "DNA"
+        }
+    }, verify=False
+    ,headers=headers)    
+    
+    idt_response.raise_for_status()
+    
+    return idt_response.json()['MeltTemp'] 
+========================================
+def do(self):
+        # logging.debug("{} {}: \n\tHeaders {}, \n\tData {}, \n\tParams {}, \n\tOther: {}".format(
+        #     self.method.upper(), self.url, self.headers,
+        #     self.data, self.params, self.kwargs
+        # ))
+        result = self.methods.get(self.method)(
+            url=self.url, headers=self.headers,
+            data=self.data, params=self.params,
+            **self.kwargs
+        )
+        return result 
+========================================
+def do(self, api_name=None, pk=None, method='get', use_auth=True,
+           data=None, params=None, content_type='application/json', **kwargs):
+
+        if api_name in API_URL_MAPPING:
+            path = API_URL_MAPPING.get(api_name)
+            if pk and '%s' in path:
+                path = path % pk
+        else:
+            path = api_name
+
+        request_headers = kwargs.get('headers', {})
+        default_headers = self.default_headers or {}
+        headers = {k: v for k, v in default_headers.items()}
+        headers.update(request_headers)
+        kwargs['headers'] = headers
+        url = self.endpoint.rstrip('/') + path
+        req = HttpRequest(url, method=method, data=data,
+                          params=params, content_type=content_type,
+                          **kwargs)
+        if use_auth:
+            if not self.auth:
+                msg = 'Authentication required, but not provide'
+                logger.error(msg)
+                raise RequestError(msg)
+            else:
+                self.auth.sign_request(req)
+
+        try:
+            resp = req.do()
+        except (requests.ConnectionError, requests.ConnectTimeout) as e:
+            msg = "Connect endpoint {} error: {}".format(self.endpoint, e)
+            logger.error(msg)
+            raise RequestError(msg)
+
+        return self.clean_result(resp) 
+========================================
+def get(self, *args, **kwargs):
+        kwargs['method'] = 'get'
+        return self.do(*args, **kwargs) 
+========================================
+def create_record(self, dns_type, name, content, **kwargs):
+        """
+        Create a dns record
+        :param dns_type:
+        :param name:
+        :param content:
+        :param kwargs:
+        :return:
+        """
+        data = {
+            'type': dns_type,
+            'name': name,
+            'content': content
+        }
+        if kwargs.get('ttl') and kwargs['ttl'] != 1:
+            data['ttl'] = kwargs['ttl']
+        if kwargs.get('proxied') is True:
+            data['proxied'] = True
+        else:
+            data['proxied'] = False
+        content = self.request(
+            self.api_url + self.zone['id'] + '/dns_records',
+            'post',
+            data=data
+        )
+        print('DNS record successfully created')
+        return content['result'] 
+========================================
+def update_record(self, dns_type, name, content, **kwargs):
+        """
+        Update dns record
+        :param dns_type:
+        :param name:
+        :param content:
+        :param kwargs:
+        :return:
+        """
+        record = self.get_record(dns_type, name)
+        data = {
+            'type': dns_type,
+            'name': name,
+            'content': content
+        }
+        if kwargs.get('ttl') and kwargs['ttl'] != 1:
+            data['ttl'] = kwargs['ttl']
+        if kwargs.get('proxied') is True:
+            data['proxied'] = True
+        else:
+            data['proxied'] = False
+        content = self.request(
+            urllib.parse.urljoin(self.api_url, self.zone['id'] + '/dns_records/' + record['id']),
+            'put',
+            data=data
+        )
+        print('DNS record successfully updated')
+        return content['result'] 
+========================================
+def search(self, type, q, territory='TW'):
+        response = requests.get(self.API_BASE_URL + 'search', params={'type': type, 'q': q, 'territory': territory},
+                                headers={'Authorization': 'Bearer ' + self.token})
+        response.raise_for_status()
+        response_json = response.json()
+
+        if type == 'artist':
+            return response_json['artists']['data'][0]['url']
+        else:
+            id = response_json[type + 's']['data'][0]['id']
+            return 'https://widget.kkbox.com/v1/?id=' + id \
+                   + '&type=' + ('song' if type == 'track' else type) 
+========================================
+def _get_cache_stale_secs(cache_stale=None):
+    # overrides config
+    caching_val = config.CONFIG.parser.get('cache', 'normal')
+    if caching_val in ('never', 'false', 'False', 'off', 'Off'):
+        return 0
+    if caching_val in ('test', 'forever'):
+        return CACHE_FOREVER
+    if cache_stale is None:
+        return 0
+    return cache_stale 
+========================================
+def request_json(url, output_filename=None, cache_stale=None):
+    """Sends a request expecting a json-formatted response.
+    If output_filename is given, then the output is saved to file.
+    This also enables basic caching, where cache_stale is the number of seconds
+    since file is last modified before the cached file is considered stale (0 means disable the cache).
+    """
+    cache_stale = _get_cache_stale_secs(cache_stale)
+    # Guard against very long filenames:
+    if output_filename and len(output_filename) >= MAX_CACHE_FILENAME_LEN:
+        output_filename = output_filename[0:MAX_CACHE_FILENAME_LEN-1]
+    if output_filename and cache_stale:
+        if output_filename in CACHE:
+            return CACHE[output_filename]
+        json_file = os.path.join(_get_cachedir(), '{}.json'.format(output_filename))
+        if os.path.exists(json_file) and (int(time.time()) - os.path.getmtime(json_file) < cache_stale):
+            with open(json_file) as jfh:
+                CACHE[output_filename] = json.load(jfh)
+            if config.DEBUG:
+                LOG.info('Loaded from cache: %s', output_filename)
+            return CACHE[output_filename]
+
+    LOG.debug('Getting url=%s ...', url)
+    headers = {
+        'User-Agent': config.CONFIG.ua_iphone,
+        'Connection': 'close'
+    }
+    util.log_http(url, 'get', headers, sys._getframe().f_code.co_name)
+    response = requests.get(url, headers=headers, verify=config.VERIFY_SSL)
+    response.raise_for_status()
+
+    # Note: this fails on windows in some cases https://github.com/kennethreitz/requests-html/issues/171
+    if output_filename is not None or (config.DEBUG and config.SAVE_JSON_FILE):
+        json_file = os.path.join(_get_cachedir(), '{}.json'.format(output_filename))
+        with open(json_file, 'w', encoding='utf-8') as out:  # write date to json_file
+            out.write(response.text)
+    if cache_stale:
+        LOG.debug('Caching url=%s, filename=%s', url, output_filename)
+        CACHE[output_filename] = response.json()
+        return CACHE[output_filename]
+    return response.json() 
+========================================
+def get_attrib(self, et_node, prefixed_attrib):
+        """Get a prefixed attribute like 'rdf:resource' from ET node."""
+        prefix, attrib = prefixed_attrib.split(':')
+        return et_node.get('{{{0}}}{1}'.format(self.namespaces[prefix],
+                                               attrib)) 
+========================================
+def __init__(self, namespaces=None, cc_resolver=None, source=None):
+        """Init the remote loader."""
+        super(RemoteFundRefLoader, self).__init__(
+            namespaces=namespaces, cc_resolver=cc_resolver)
+        self.source = source or \
+            current_app.config['OPENAIRE_FUNDREF_ENDPOINT']
+        headers = {"Content-Type": "application/rdf+xml"}
+        obj = requests.get(self.source, stream=True, headers=headers)
+        funders_xml = obj.text.encode('utf-8')
+        self.doc_root = ET.fromstring(funders_xml) 
+========================================
+def resolve_by_id(self, funder_id):
+        """Resolve the funder from the OpenAIRE funder id.
+
+        If funder_id can be resolved, return a URI otherwise return None.
+        """
+        return self.data.get(funder_id) 
+========================================
+def resolve_by_oai_id(self, oai_id):
+        """Resolve the funder from the OpenAIRE OAI record id.
+
+        Hack for when funder is not provided in OpenAIRE.
+        """
+        if oai_id.startswith('oai:dnet:'):
+            oai_id = oai_id[len('oai:dnet:'):]
+        prefix = oai_id.split("::")[0]
+        suffix = prefix.replace("_", "").upper()
+        oaf = "{0}::{1}".format(prefix, suffix)
+        return self.data.get(oaf) 
+========================================
+def resolve_by_doi(self, doi):
+        """Resolve a DOI to an OpenAIRE id."""
+        return self.inverse_data.get(doi) 
+========================================
+def forward(self, text):
+
+        '''
+        In PyTorch RNNs want the input with batch dim second, CNNs want the batch dim first
+        we permute the input to make it the right shape for the CNN
+        '''
+        text = text.permute(1, 0)
+
+        # Text passed through embedding layer to get embeddings
+        embedded = self.embedding(text)
+
+        '''
+        A conv layer wants the second dim of the input to be a channel dim
+        text does not have a channel dim, so the tensor is unsqueezed to create one
+        '''
+        embedded = embedded.unsqueeze(1)
+
+        # Iterates through the list of conv layers applying each conv layer to get list of conv outputs
+        conved = [F.relu(conv(embedded)).squeeze(3) for conv in self.convs]
+
+        '''
+        Conv outputs are passed through a max pooling that takes the maximum value over a dimension
+        the idea being that the "maximum value" is the most important feature for determining the sentiment
+        which corresponds to the most important n-gram in the review
+        '''
+        pooled = [F.max_pool1d(conv, conv.shape[2]).squeeze(2) for conv in conved]
+
+        '''
+        The model has 100 filters of 3 different sizes, therefore 300 n-grams that could be important
+        which we concatenate into a single vector and pass through a dropout layer and finally a linear layer
+        (NOTE: dropout is set to 0 during inference time)
+        '''
+        cat = self.dropout(torch.cat(pooled, dim = 1))
+
+        # passed through linear layer to make predictions
+        return self.fc(cat) 
+========================================
+def get_soup(any_url):
+    # 传入链接
+    # 返回BeautifulSoup对象
+    result = requests.get(any_url, headers=header[random.randint(0, 4)])
+    html_doc = result.content
+    try:
+        html_doc = html_doc.decode('utf-8')
+    except UnicodeDecodeError:
+        html_doc = html_doc.decode('gbk')
+    soup = BeautifulSoup(html_doc, 'html.parser')
+    return soup 
+========================================
+def get_soup(any_url):
+    # 传入链接
+    # 返回BeautifulSoup对象
+    result = requests.get(any_url, headers=header[random.randint(0, 4)])
+    html_doc = result.content
+    try:
+        html_doc = html_doc.decode('utf-8')
+    except UnicodeDecodeError:
+        html_doc = html_doc.decode('gbk')
+    soup = BeautifulSoup(html_doc, 'html.parser')
+    return soup 
+========================================
+def get_soup(any_url):
+    # 传入链接
+    # 返回BeautifulSoup对象
+    result = requests.get(any_url, headers=header[random.randint(0, 4)])
+    html_doc = result.content
+    try:
+        html_doc = html_doc.decode('utf-8')
+    except UnicodeDecodeError:
+        html_doc = html_doc.decode('gbk')
+    soup = BeautifulSoup(html_doc, 'html.parser')
+    return soup 
+========================================
+def nodeLatestVersion(dependency, project_id):
+    r = requests.get('%s%s/latest' % (app.config['NPM_REGISTRY'], dependency))
+    latestVersion = r.json().get('version')
+
+    try:
+        dep = ProjectDependency.by_project(project_id, dependency)
+        dep.latest_version = latestVersion
+        if LooseVersion(dep.actual_version) < LooseVersion(latestVersion):
+            dep.status = 'ko'
+        else:
+            dep.status = 'ok'
+        db.session.commit()
+    except Exception, e:
+        app.logger.error(e)
+        db.session.rollback() 
+========================================
+def nodeDepsFetcher(project_id):
+    # Get dependencies from package.json
+    project = git.getproject(project_id)
+
+    depFileEncoded = git.getfile(project_id, 'package.json',
+                                 project['default_branch'])
+
+    # Decode from base64
+    deps = json.loads(depFileEncoded.get('content').decode('base64'))
+
+    mainDeps = deps.get('dependencies')
+    devDeps = deps.get('devDependencies')
+
+    # Insert in project_dependency
+    # TODO create single function for that
+    for mDep, mVersion in list(mainDeps.items()):
+        mdep, created = get_or_create(db.session, ProjectDependency,
+                                      project_id=project_id, name=mDep,
+                                      actual_version=mVersion)
+
+        if not created:
+            app.logger.info('[%s] Dep %s already exist' % (project_id, mDep))
+
+        db.session.commit()
+        nodeLatestVersion(mDep, project_id)
+
+    for devDep, devVersion in list(devDeps.items()):
+        ddep, created = get_or_create(db.session, ProjectDependency,
+                                      project_id=project_id, name=devDep,
+                                      actual_version=devVersion, dev=True)
+
+        if not created:
+            app.logger.info('[%s] Dev dep %s already exist' %
+                            (project_id, devDep))
+
+        db.session.commit()
+        nodeLatestVersion(devDep, project_id)
+    return True 
