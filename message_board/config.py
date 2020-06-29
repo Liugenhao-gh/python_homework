@@ -12,4 +12,3 @@ USERNAME = 'root'
 PASSWORD = 'lgh1519'
 DB_URI = "mysql+pymysql://{}:{}@{}:{}/{}?charset=utf8".format(USERNAME, PASSWORD, HOSTNAME, PORT, DATABASE)
 SQLALCHEMY_DATABASE_URI = DB_URI
-# SQLALCHEMY_DATEBASE_URI = "mysql://root:lgh1519:3306/message_board?charset=utf8"

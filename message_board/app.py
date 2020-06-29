@@ -15,7 +15,7 @@ db.init_app(app)
 #每页留言条数
 per_page = 5
 
-
+# 主页
 @app.route('/')
 def index():
     #获取页码数
@@ -24,7 +24,7 @@ def index():
     query = Message.query.order_by(Message.create_time.desc())
     paginate = query.paginate(page=int(page), per_page=per_page)
     return render_template('index.html', paginate=paginate)
-
+# 登录
 @app.route('/login/', methods=['GET','POST'])
 def login():
     if request.method == 'GET':
@@ -42,7 +42,7 @@ def login():
 
         else:
             return u"用户名或密码错误，请确认后再登录。"
-
+# 注册
 @app.route('/regist/', methods=['GET','POST'])
 def regist():
     if request.method == 'GET':
@@ -92,11 +92,12 @@ def leave():
             db.session.add(message)
             db.session.commit()
             return redirect(url_for('index'))
+# 查找
 @app.route('/search/')
 def search():
     q = request.args.get('q')
     page = request.args.get('page', 1)
-    # username, message
+    # 根据username和message查找
     users = User.query.filter(User.username.contains(q)).all()
     users_id =[]
     for user in users:
@@ -104,15 +105,10 @@ def search():
     if len(users_id)==0:
         users_id = [0]
     messages = Message.query.filter(or_(Message.message.contains(q), Message.author_id.contains(users_id))).order_by(Message.create_time.desc())
-    # messages = Message.query.filter(Message.message.contains(q)).order_by(Message.create_time.desc())
-    # messages = Message.query.filter( Message.author_id.contains(users_id)).order_by(
-    #     Message.create_time.desc())
     paginate = messages.paginate(page=int(page), per_page=per_page)
-    # if paginate:
     return render_template('search.html', paginate=paginate,q=q)
-    # else:
-    #     return u'没有找到。'
 
+# 个人中心、管理自己的留言
 @app.route('/MyCenter/')
 def MyCenter():
     page = request.args.get('page',1)
@@ -122,7 +118,7 @@ def MyCenter():
     paginate = messages.paginate(page=int(page), per_page=per_page)
 
     return render_template('private.html', paginate=paginate)
-
+# 删除自己的留言
 @app.route('/delete/')
 @center_to_index
 def delete():
@@ -132,7 +128,7 @@ def delete():
     db.session.commit()
     return redirect(url_for('MyCenter'))
 
-# 钩子函数，检查是否登录
+# 钩子函数，上下文
 @app.context_processor
 def my_context_processor():
     user_id = session.get('user_id')
