@@ -24,6 +24,7 @@ def index():
     query = Message.query.order_by(Message.create_time.desc())
     paginate = query.paginate(page=int(page), per_page=per_page)
     return render_template('index.html', paginate=paginate)
+
 # 登录
 @app.route('/login/', methods=['GET','POST'])
 def login():
@@ -39,9 +40,9 @@ def login():
             # 31天内不用再登录
             session.permanent = True
             return redirect(url_for('index'))
-
         else:
             return u"用户名或密码错误，请确认后再登录。"
+
 # 注册
 @app.route('/regist/', methods=['GET','POST'])
 def regist():
@@ -66,6 +67,7 @@ def regist():
                 db.session.commit()
                 # 注册成功，返回登录界面
                 return redirect(url_for('login'))
+
 #注销
 @app.route('/logout/')
 def logout():
@@ -116,8 +118,8 @@ def MyCenter():
     messages = Message.query.filter(Message.author_id.contains(user_id)).order_by(
         Message.create_time.desc())
     paginate = messages.paginate(page=int(page), per_page=per_page)
-
     return render_template('private.html', paginate=paginate)
+
 # 删除自己的留言
 @app.route('/delete/')
 @center_to_index
@@ -137,5 +139,6 @@ def my_context_processor():
         if user:
             return {'user': user}
     return {}
+
 if __name__ == '__main__':
     app.run(Debug=True)
