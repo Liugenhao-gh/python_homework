@@ -32,8 +32,8 @@ def login():
     else:
         Email = request.form.get('Email')
         password = request.form.get('password')
-        user = User.query.filter(User.Email == Email, User.password == password).first()
-        if user:
+        user = User.query.filter(User.Email == Email).first()
+        if user and user.check_password(password):
             # 记录进入cookie
             session['user_id'] = user.id
             # 31天内不用再登录
@@ -132,7 +132,7 @@ def delete():
     db.session.commit()
     return redirect(url_for('MyCenter'))
 
-# 钩子函数，上下文切换
+# 钩子函数，检查是否登录
 @app.context_processor
 def my_context_processor():
     user_id = session.get('user_id')
